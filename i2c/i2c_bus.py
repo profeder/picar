@@ -1,4 +1,5 @@
 import threading
+from ctypes import c_int16
 
 from smbus import SMBus
 from threading import Condition
@@ -62,6 +63,16 @@ class I2CBus:
         if not self.__have_connection():
             self.start_comunication(self.__address)
         data = self.__bus.read_byte_data(self.__address, address)
+        return data
+
+    def read_word(self, base_address, flip=False):
+        if not self.__have_connection():
+            self.start_comunication(self.__address)
+        h = self.read_byte(base_address)
+        l = self.read_byte(base_address + 1)
+        data = h << 8 | l
+        if flip:
+            data = l << 8 | h
         return data
 
     def write_byte(self, address, data):

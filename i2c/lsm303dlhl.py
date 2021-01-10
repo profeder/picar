@@ -182,6 +182,7 @@ class CrbRegM(I2CRegisterConfiguration):
             strout += '8.1'
         return strout
 
+
 class MrRegM(I2CRegisterConfiguration):
     __REGISTER_ADDRESS = 0x02
 
@@ -201,6 +202,7 @@ class MrRegM(I2CRegisterConfiguration):
         if self._data in [self.SLEEP_MODE, 0x30]:
             strout += 'Sleep-mode. Device is placed in sleep-mode'
         return strout
+
 
 class LSM303DLHL:
     """
@@ -223,19 +225,13 @@ class LSM303DLHL:
 
     __OUT_STATUS = 0x27
 
-    __OUT_X_L_A = 0x28
-    __OUT_X_H_A = 0x29
-    __OUT_Y_L_A = 0x2a
-    __OUT_Y_H_A = 0x2b
-    __OUT_Z_L_A = 0x2c
-    __OUT_Z_H_A = 0x2d
+    __OUT_XACC = 0x28
+    __OUT_YACC = 0x2a
+    __OUT_ZACC = 0x2c
 
-    __OUT_X_H_M = 0x3
-    __OUT_X_L_M = 0x4
-    __OUT_Y_H_M = 0x5
-    __OUT_Y_L_M = 0x6
-    __OUT_Z_H_M = 0x7
-    __OUT_Z_L_M = 0x8
+    __OUT_XMAG = 0x3
+    __OUT_YMAG = 0x5
+    __OUT_ZMAG = 0x7
 
     __bus = None
     __ctrl_reg1_a = CtrlReg1A()
@@ -258,31 +254,19 @@ class LSM303DLHL:
             self.__bus.start_comunication(self.ACC_ADDRESS)
             status = self.__bus.read_byte(self.__OUT_STATUS)
             if status & 0x01 and self.__ctrl_reg1_a.x_enable():
-                x_h = self.__bus.read_byte(self.__OUT_X_H_A)
-                x_l = self.__bus.read_byte(self.__OUT_X_L_A)
-                out[0] = c_int16(x_h << 8 | x_l).value
+                out[0] = c_int16(self.__bus.read_word(self.__OUT_XACC, True)).value
             if status & 0x02 and self.__ctrl_reg1_a.y_enable():
-                y_h = self.__bus.read_byte(self.__OUT_Y_H_A)
-                y_l = self.__bus.read_byte(self.__OUT_Y_L_A)
-                out[1] = c_int16(y_h << 8 | y_l).value
+                out[1] = c_int16(self.__bus.read_word(self.__OUT_YACC, True)).value
             if status & 0x04 and self.__ctrl_reg1_a.z_enable():
-                z_h = self.__bus.read_byte(self.__OUT_Z_H_A)
-                z_l = self.__bus.read_byte(self.__OUT_Z_L_A)
-                out[2] = c_int16(z_h << 8 | z_l).value
+                out[2] = c_int16(self.__bus.read_word(self.__OUT_ZACC, True)).value
             self.__bus.stop_comunication()
         return out
 
     def get_magnetic_data(self):
         out = [0, 0, 0]
         self.__bus.start_comunication(self.MAG_ADDRESS)
-        tmp_l = self.__bus.read_byte(self.__OUT_X_L_M)
-        tmp_h = self.__bus.read_byte(self.__OUT_X_H_M)
-        out[0] = c_int16(tmp_h << 8 | tmp_l).value
-        tmp_l = self.__bus.read_byte(self.__OUT_Y_L_M)
-        tmp_h = self.__bus.read_byte(self.__OUT_Y_H_M)
-        out[1] = c_int16(tmp_h << 8 | tmp_l).value
-        tmp_l = self.__bus.read_byte(self.__OUT_Z_L_M)
-        tmp_h = self.__bus.read_byte(self.__OUT_Z_H_M)
-        out[2] = c_int16(tmp_h << 8 | tmp_l).value
+        out[0] = c_int16(self.__bus.read_word(self.__OUT_XMAG)).value
+        out[1] = c_int16(self.__bus.read_word(self.__OUT_YMAG)).value
+        out[2] = c_int16(self.__bus.read_word(self.__OUT_ZMAG)).value
         self.__bus.stop_comunication()
         return out
