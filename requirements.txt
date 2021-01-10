@@ -1,2 +1,7 @@
+numpy
+picamera
 opencv-python
 paho-mqtt
+SMBus
+pika
+inputs

@@ -59,7 +59,7 @@ class CtrlReg1A(I2CRegisterConfiguration):
         return self._data and self.X_AXIS_ENABLE
 
     def __str__(self):
-        strout = str(hex(self._data)) + ' '
+        strout = '(' + str(hex(self._data)) + ') '
         nibh = (self._data >> 4) & 0x0f
         if nibh == self.__POWER_OFF:
             strout += 'Power off'
@@ -95,6 +95,113 @@ class CtrlReg1A(I2CRegisterConfiguration):
         return strout
 
 
+class CraRegM(I2CRegisterConfiguration):
+    __REGISTER_ADDRESS = 0x00
+
+    __TEMPERATURE_ENABLE = 0x80
+
+    DATA_OUTPUT_75 = 0x0
+    DATA_OUTPUT_150 = 0x1
+    DATA_OUTPUT_300 = 0x2
+    DATA_OUTPUT_750 = 0x3
+    DATA_OUTPUT_1500 = 0x4
+    DATA_OUTPUT_3000 = 0x5
+    DATA_OUTPUT_7500 = 0x6
+    DATA_OUTPUT_22000 = 0x7
+
+    def __init__(self, temperature=False, datarate=0x7):
+        """
+
+        :param temperature:
+        :param datarate:
+        """
+        data = 0
+        if temperature:
+            data = 0x1
+        data = data << 5
+        data = data | (datarate & 0x7)
+        data = data << 2
+        super(CraRegM, self).__init__(self.__REGISTER_ADDRESS, data)
+
+    def __str__(self):
+        strout = '(' + str(hex(self._data)) + ') '
+        if self._data & self.__TEMPERATURE_ENABLE:
+            strout += 'Temperature enable '
+        tmp = (self._data >> 2) & 0x7
+        strout += ' output data rate: '
+        if tmp == self.DATA_OUTPUT_75:
+            strout += '0.75'
+        if tmp == self.DATA_OUTPUT_150:
+            strout += '1.5'
+        if tmp == self.DATA_OUTPUT_300:
+            strout += '3.0'
+        if tmp == self.DATA_OUTPUT_750:
+            strout += '7.5'
+        if tmp == self.DATA_OUTPUT_1500:
+            strout += '15'
+        if tmp == self.DATA_OUTPUT_3000:
+            strout += '30'
+        if tmp == self.DATA_OUTPUT_7500:
+            strout += '75'
+        if tmp == self.DATA_OUTPUT_22000:
+            strout += '220'
+        strout += ' Hz'
+        return strout
+
+
+class CrbRegM(I2CRegisterConfiguration):
+    __REGISTER_ADDRESS = 0x01
+
+    RESOLUTION_13 = 0x20
+    RESOLUTION_19 = 0x40
+    RESOLUTION_25 = 0x60
+    RESOLUTION_40 = 0x80
+    RESOLUTION_47 = 0xa0
+    RESOLUTION_56 = 0xc0
+    RESOLUTION_81 = 0xe0
+
+    def __init__(self, resolution=0xe0):
+        super(CrbRegM, self).__init__(self.__REGISTER_ADDRESS, resolution)
+
+    def __str__(self):
+        strout = '(' + str(hex(self._data)) + ') Sensor input field range: (+/-)'
+        if self._data == self.RESOLUTION_13:
+            strout += '1.3'
+        if self._data == self.RESOLUTION_19:
+            strout += '1.9'
+        if self._data == self.RESOLUTION_25:
+            strout += '2.5'
+        if self._data == self.RESOLUTION_40:
+            strout += '4.0'
+        if self._data == self.RESOLUTION_47:
+            strout += '4.7'
+        if self._data == self.RESOLUTION_56:
+            strout += '5.6'
+        strout += ' G'
+        if self._data == self.RESOLUTION_81:
+            strout += '8.1'
+        return strout
+
+class MrRegM(I2CRegisterConfiguration):
+    __REGISTER_ADDRESS = 0x02
+
+    CONTINUOUS_CONVERTION_MODE = 0x00
+    SINGLE_CONVERTION_MODE = 0x01
+    SLEEP_MODE = 0x02
+
+    def __init__(self, mode=0x00):
+        super(MrRegM, self).__init__(self.__REGISTER_ADDRESS, mode)
+
+    def __str__(self):
+        strout = '(' + hex(self._data) + ') '
+        if self._data == self.CONTINUOUS_CONVERTION_MODE:
+            strout += 'Continuous-conversion mode'
+        if self._data == self.SINGLE_CONVERTION_MODE:
+            strout += 'Single-conversion mode'
+        if self._data in [self.SLEEP_MODE, 0x30]:
+            strout += 'Sleep-mode. Device is placed in sleep-mode'
+        return strout
+
 class LSM303DLHL:
     """
     The LSM303DLHC is a system-in-package featuring a 3D digital linear acceleration sensor and a 3D digital magnetic
@@ -112,26 +219,38 @@ class LSM303DLHL:
     """
 
     ACC_ADDRESS = 0x19
+    MAG_ADDRESS = 0x1e
 
     __OUT_STATUS = 0x27
 
     __OUT_X_L_A = 0x28
     __OUT_X_H_A = 0x29
-
     __OUT_Y_L_A = 0x2a
     __OUT_Y_H_A = 0x2b
-
     __OUT_Z_L_A = 0x2c
     __OUT_Z_H_A = 0x2d
 
+    __OUT_X_H_M = 0x3
+    __OUT_X_L_M = 0x4
+    __OUT_Y_H_M = 0x5
+    __OUT_Y_L_M = 0x6
+    __OUT_Z_H_M = 0x7
+    __OUT_Z_L_M = 0x8
+
     __bus = None
     __ctrl_reg1_a = CtrlReg1A()
+    __cra_reg_m = CraRegM()
+    __crb_reg_m = CrbRegM()
+    __mr_reg_m = MrRegM()
 
     def __init__(self, bus, ctrlReg1=None):
         self.__bus = bus
         if ctrlReg1 is not None:
             self.__ctrl_reg1_a = ctrlReg1
         bus.save_configuration(self.__ctrl_reg1_a, self.ACC_ADDRESS)
+        bus.save_configuration(self.__cra_reg_m, self.MAG_ADDRESS)
+        bus.save_configuration(self.__crb_reg_m, self.MAG_ADDRESS)
+        bus.save_configuration(self.__mr_reg_m, self.MAG_ADDRESS)
 
     def get_accelerometer_data(self):
         out = [0, 0, 0]
@@ -151,4 +270,19 @@ class LSM303DLHL:
                 z_l = self.__bus.read_byte(self.__OUT_Z_L_A)
                 out[2] = c_int16(z_h << 8 | z_l).value
             self.__bus.stop_comunication()
+        return out
+
+    def get_magnetic_data(self):
+        out = [0, 0, 0]
+        self.__bus.start_comunication(self.MAG_ADDRESS)
+        tmp_l = self.__bus.read_byte(self.__OUT_X_L_M)
+        tmp_h = self.__bus.read_byte(self.__OUT_X_H_M)
+        out[0] = c_int16(tmp_h << 8 | tmp_l).value
+        tmp_l = self.__bus.read_byte(self.__OUT_Y_L_M)
+        tmp_h = self.__bus.read_byte(self.__OUT_Y_H_M)
+        out[1] = c_int16(tmp_h << 8 | tmp_l).value
+        tmp_l = self.__bus.read_byte(self.__OUT_Z_L_M)
+        tmp_h = self.__bus.read_byte(self.__OUT_Z_H_M)
+        out[2] = c_int16(tmp_h << 8 | tmp_l).value
+        self.__bus.stop_comunication()
         return out
